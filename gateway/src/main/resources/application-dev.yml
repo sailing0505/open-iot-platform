@@ -1,0 +1,72 @@
+#端口
+server:
+  port: 9005
+spring: 
+  cloud:
+     gateway:
+       discovery:  
+         locator:  
+           lowerCaseServiceId: true
+           enabled: true
+       routes:
+        - id: api-eureka
+          uri: lb://eureka-server
+          order: 8000
+          predicates:
+            - Path=/api-eureka/**
+          filters:
+            - StripPrefix=1   
+            - name: Hystrix
+              args:
+                name : default
+                fallbackUri: 'forward:/defaultfallback'
+        - id: api-device
+          uri: lb://device-center
+          order: 8001
+          predicates:
+            - Path=/api-device/**   
+          filters:
+            - GwSwaggerHeaderFilter
+            - StripPrefix=1 
+            - name: Hystrix
+              args:
+                name : default
+                fallbackUri: 'forward:/defaultfallback'
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10  # 令牌桶的容积
+                redis-rate-limiter.burstCapacity: 20  # 流速 每秒
+                key-resolver: "#{@ipAddressKeyResolver}" #SPEL表达式去的对应的bean
+        - id: api-auth
+          uri: lb://auth-server
+          order: 8002
+          predicates:
+            - Path=/api-auth/**
+          filters:
+            - GwSwaggerHeaderFilter
+            - StripPrefix=1
+            - name: Hystrix
+              args:
+                name : default
+                fallbackUri: 'forward:/defaultfallback'
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10  # 令牌桶的容积
+                redis-rate-limiter.burstCapacity: 20  # 流速 每秒
+                key-resolver: "#{@ipAddressKeyResolver}" #SPEL表达式去的对应的bean
+
+ribbon:
+  eureka:
+    enabled: true
+
+eureka: 
+  client:
+    serviceUrl:
+      defaultZone: http://127.0.0.1:9000/eureka/
+    registry-fetch-interval-seconds: 3  
+    instance-info-replication-interval-seconds: 3      
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${spring.cloud.client.ip-address}:${spring.application.instance_id:${server.port}}
+    lease-renewal-interval-in-seconds: 5
+            
